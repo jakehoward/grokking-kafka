@@ -6,6 +6,18 @@
            [org.apache.kafka.clients.consumer KafkaConsumer])
   (:gen-class))
 
+(def tsprintln-ch (async/chan))
+(defn tsprintln-runner []
+  (async/go-loop []
+    (when-let [m (async/<! tsprintln-ch)]
+      (println m)
+      (recur))))
+
+(defn tsprintln
+  "A thread safe println."
+  [& args]
+  (async/go (async/>! tsprintln-ch (clojure.string/join " " args))))
+
 ;; song
 (def songs ["Dido - Here With Me"
             "Madonna - Frozen"
@@ -45,14 +57,16 @@
                  :event (first (shuffle ["view" "buy" "click"]))
                  :event-time (.toString (java.time.Instant/now))}]
       (async/>! ch event))
-    (Thread/sleep (/ 1000 events-per-second))))
+    (Thread/sleep (/ 1000 events-per-second))
+    (recur)))
 
 (defn user-updates [ch events-per-second]
   (async/go-loop []
     (let [user (first (shuffle users))
           updated-user (assoc user :listening-to (first (shuffle songs)))]
       (async/>! ch updated-user))
-    (Thread/sleep (/ 1000 events-per-second))))
+    (Thread/sleep (/ 1000 events-per-second))
+    (recur)))
 
 
 (def producer-cfg {"value.serializer" ByteArraySerializer
@@ -83,54 +97,51 @@
 (def user-consumer (doto (KafkaConsumer. user-consumer-cfg)
                       (.subscribe ["user-profile"])))
 
-(defn process-event-record [record print-ch]
+(defn process-event-record [record]
   (let [m (-> record
               (.value)
               nippy/thaw)]
-    (async/>!! print-ch (str "Event record seen: " m))))
+    (tsprintln "Event record seen: " m)))
 
-(defn process-user-record [record print-ch]
+(defn process-user-record [record]
   (let [m (-> record
               (.value)
               nippy/thaw)]
-    (async/>!! print-ch (str "User record seen: " m))))
+    (tsprintln "User record seen:" m)))
 
 (defn run []
   (let [event-ch (async/chan)
-        user-ch (async/chan)
-        print-ch (async/chan)]
+        user-ch (async/chan)]
     (event-stream event-ch 1)
     (user-updates user-ch 0.5)
 
     (async/go-loop []
       (when-let [event (async/<! event-ch)]
-        (.send producer (ProducerRecord. "event-stream" (nippy/freeze event)))))
+        (.send producer (ProducerRecord. "event-stream" (nippy/freeze event)))
+        (recur)))
 
     (async/go-loop []
       (when-let [user-profile (async/<! user-ch)]
-        (.send producer (ProducerRecord. "user-profile" (nippy/freeze user-profile)))))
+        (.send producer (ProducerRecord. "user-profile" (nippy/freeze user-profile)))
+        (recur)))
 
     (async/thread
       (while true
         (let [records (.poll event-consumer 10)]
           (doseq [record records]
-            (process-event-record record print-ch)
+            (process-event-record record)
             ;; Not good for throughput
-            )
-          (.commitSync event-consumer))))
+            (.commitSync event-consumer)))))
 
     (async/thread
       (while true
         (let [records (.poll user-consumer 5)]
           (doseq [record records]
-            (process-user-record record print-ch)
+            (process-user-record record)
             ;; Not good for throughput
-            )
-          (.commitSync user-consumer))))
+            (.commitSync user-consumer))))))
 
-    (async/go-loop []
-      (when-let [m (async/<! print-ch)]
-        (println m))))
+  (tsprintln-runner)
 
   (async/chan))
 
@@ -138,4 +149,5 @@
   "The Trial"
   [& args]
   (assert  (>= (count songs) (count users)))
+  ;; Don't stop process
   (async/<!! (run)))
