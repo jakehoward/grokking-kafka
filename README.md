@@ -29,6 +29,11 @@ java -jar target/uberjar/grokking-kafka-0.1.0-SNAPSHOT-standalone.jar {command-n
 
 where command name is one of the available commands. Run with no args to get a list of available commands printed to the console.
 
+Example working usage:
+```
+lein run basic-pub-sub
+```
+
 When the program starts, it will publish a stream of randomly generated events to one topic and updates to a user profile to another (full profile, not diffs). Each of the commands will then consume it in some way to demonstrate how the consumption of topics works in Kafka.
 
 ## Guides/Docs/Resources
