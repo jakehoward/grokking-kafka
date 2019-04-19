@@ -36,6 +36,23 @@ lein run basic-pub-sub
 
 When the program starts, it will publish a stream of randomly generated events to one topic and updates to a user profile to another (full profile, not diffs). Each of the commands will then consume it in some way to demonstrate how the consumption of topics works in Kafka.
 
+## Useful commands
+
+See where your consumer has got to in the logs:
+```
+bin/kafka-run-class.sh kafka.admin.ConsumerGroupCommand --group event-stream-consumer --bootstrap-server localhost:9092 --describe
+```
+
+List topics:
+```
+bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+```
+
+Consume topic:
+```
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic event-count-by-user --from-beginning
+```
+
 ## Guides/Docs/Resources
 - https://kafka.apache.org/22/javadoc/index.html?org/apache/kafka/clients/producer/KafkaProducer.html
 - https://kafka.apache.org/22/javadoc/index.html?org/apache/kafka/clients/consumer/KafkaConsumer.html
