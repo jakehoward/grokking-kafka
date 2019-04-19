@@ -2,7 +2,10 @@
   (:require [clojure.core.async :as async]
             [taoensso.nippy :as nippy])
   (:import [org.apache.kafka.common.serialization ByteArrayDeserializer]
-           [org.apache.kafka.clients.consumer KafkaConsumer]))
+           [org.apache.kafka.clients.consumer KafkaConsumer]
+           [org.apache.kafka.streams StreamsBuilder KafkaStreams StreamsConfig]
+           [org.apache.kafka.streams.kstream Materialized Produced KeyValueMapper TimeWindows]
+           [org.apache.kafka.common.serialization Serdes]))
 
 
 (def tsprintln-ch (async/chan))
@@ -60,5 +63,51 @@
             ;; Not good for throughput
             (.commitSync user-consumer)))))))
 
+(defn basic-stream-processing []
+  (let [event-consumer-cfg {"bootstrap.servers" "localhost:9092"
+                            "group.id" "basic-stream-event-count-consumer"
+                            "auto.offset.reset" "earliest"
+                            "enable.auto.commit" "false"
+                            "key.deserializer" ByteArrayDeserializer
+                            "value.deserializer" ByteArrayDeserializer}
+        event-count-topic "event-count-by-user"
+        count-consumer (doto (KafkaConsumer. event-consumer-cfg)
+                         (.subscribe [event-count-topic]))
 
-(def exports {"basic-pub-sub" basic-pub-sub})
+        builder (StreamsBuilder.)
+
+        props (java.util.Properties.)
+        _ (. props (put StreamsConfig/APPLICATION_ID_CONFIG "event-count-application"))
+        _ (. props (put StreamsConfig/BOOTSTRAP_SERVERS_CONFIG "localhost:9092"))
+        _ (. props (put StreamsConfig/DEFAULT_KEY_SERDE_CLASS_CONFIG (.getClass (Serdes/ByteArray))))
+        _ (. props (put StreamsConfig/DEFAULT_VALUE_SERDE_CLASS_CONFIG (.getClass (Serdes/ByteArray))))
+
+        events (. builder (stream "event-stream"))
+        event-counts (.. events
+                         (groupBy (reify KeyValueMapper
+                                    (apply [_ k event]
+                                      (:user-id event))))
+                         (windowedBy (TimeWindows/of 5000))
+                         (count (Materialized/as "event-count-store")))
+
+        _ (.. event-counts
+              toStream
+              (to event-count-topic
+                  (Produced/with (Serdes/ByteArray) (Serdes/ByteArray))))
+        topology (.build builder)
+        streams (KafkaStreams. topology props)]
+
+    (println "\n\n" (.describe topology) "\n\n")
+    (.start streams)
+
+    (async/thread
+      (while true
+        (let [records (.poll count-consumer 10)]
+          (doseq [record records]
+            (print-record record)
+            ;; Not good for throughput
+            (.commitSync count-consumer)))))))
+
+
+(def exports {"basic-pub-sub" basic-pub-sub
+              "basic-stream-processing" basic-stream-processing})
