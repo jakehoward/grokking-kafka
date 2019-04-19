@@ -2,27 +2,24 @@
 
 Convincing my brain cells to form a quorum.
 
-## Starting kafka - single host
-- See: https://github.com/wurstmeister/kafka-docker and: https://github.com/wurstmeister/kafka-docker/wiki/Connectivity
+## Starting Kafka
 
-```
-docker-compose -f docker-compose-single-broker.yml up -d
-```
+This is from https://kafka.apache.org/quickstart, ideally we could spin up a docker container but for some reason the networking wasn't playing ball. Will come back to that (https://github.com/wurstmeister/kafka-docker, https://github.com/wurstmeister/kafka-docker/wiki/Connectivity).
 
-### Stopping
-
-```
-docker-compose -f docker-compose-single-broker.yml stop
-```
+1. Download Kafka from: https://kafka.apache.org/downloads
+1. Download the sha and check it, e.g: `gpg --print-md SHA512 ~/Downloads/kafka_2.12-2.2.0.tgz`
+1. Unzip it: `tar -xf kafka_2.12-2.2.0.tgz`
+1. Open two tabs, in one start zookeeper: `bin/zookeeper-server-start.sh config/zookeeper.properties`
+1. In the other start kafka: `bin/kafka-server-start.sh config/server.properties`
 
 ## Usage
 
-lazy:
+Run with lein:
 ```
 lein run
 ```
 
-slightly less lazy:
+Build uberjar and run it:
 ```
 lein uberjar
 java -jar target/uberjar/grokking-kafka-0.1.0-SNAPSHOT-standalone.jar
