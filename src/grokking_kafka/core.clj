@@ -1,24 +1,12 @@
 (ns grokking-kafka.core
   (:require [clojure.core.async :as async]
-            [taoensso.nippy :as nippy])
-  (:import [org.apache.kafka.common.serialization ByteArraySerializer ByteArrayDeserializer]
-           [org.apache.kafka.clients.producer KafkaProducer ProducerRecord]
-           [org.apache.kafka.clients.consumer KafkaConsumer])
+            [taoensso.nippy :as nippy]
+            [grokking-kafka.commands :as commands])
+  (:import [org.apache.kafka.common.serialization ByteArraySerializer]
+           [org.apache.kafka.clients.producer KafkaProducer ProducerRecord])
   (:gen-class))
 
-(def tsprintln-ch (async/chan))
-(defn tsprintln-runner []
-  (async/go-loop []
-    (when-let [m (async/<! tsprintln-ch)]
-      (println m)
-      (recur))))
 
-(defn tsprintln
-  "A thread safe println."
-  [& args]
-  (async/go (async/>! tsprintln-ch (clojure.string/join " " args))))
-
-;; song
 (def songs ["Dido - Here With Me"
             "Madonna - Frozen"
             "Kate Bush - Running Up That Hill"
@@ -75,43 +63,10 @@
 
 (def producer (KafkaProducer. producer-cfg))
 
-(def event-consumer-cfg
-  {"bootstrap.servers" "localhost:9092"
-   "group.id" "event-stream-consumer"
-   "auto.offset.reset" "earliest"
-   "enable.auto.commit" "false"
-   "key.deserializer" ByteArrayDeserializer
-   "value.deserializer" ByteArrayDeserializer})
-
-(def user-consumer-cfg
-  {"bootstrap.servers" "localhost:9092"
-   "group.id" "user-stream-consumer"
-   "auto.offset.reset" "earliest"
-   "enable.auto.commit" "false"
-   "key.deserializer" ByteArrayDeserializer
-   "value.deserializer" ByteArrayDeserializer})
-
-(def event-consumer (doto (KafkaConsumer. event-consumer-cfg)
-                      (.subscribe ["event-stream"])))
-
-(def user-consumer (doto (KafkaConsumer. user-consumer-cfg)
-                      (.subscribe ["user-profile"])))
-
-(defn process-event-record [record]
-  (let [m (-> record
-              (.value)
-              nippy/thaw)]
-    (tsprintln "Event record seen: " m)))
-
-(defn process-user-record [record]
-  (let [m (-> record
-              (.value)
-              nippy/thaw)]
-    (tsprintln "User record seen:" m)))
-
 (defn run []
   (let [event-ch (async/chan)
         user-ch (async/chan)]
+
     (event-stream event-ch 1)
     (user-updates user-ch 0.5)
 
@@ -125,29 +80,19 @@
         (.send producer (ProducerRecord. "user-profile" (nippy/freeze user-profile)))
         (recur)))
 
-    (async/thread
-      (while true
-        (let [records (.poll event-consumer 10)]
-          (doseq [record records]
-            (process-event-record record)
-            ;; Not good for throughput
-            (.commitSync event-consumer)))))
-
-    (async/thread
-      (while true
-        (let [records (.poll user-consumer 5)]
-          (doseq [record records]
-            (process-user-record record)
-            ;; Not good for throughput
-            (.commitSync user-consumer))))))
-
-  (tsprintln-runner)
-
-  (async/chan))
+    (async/chan)))
 
 (defn -main
   "The Trial"
   [& args]
   (assert  (>= (count songs) (count users)))
+  (let [command-name (first args)]
+    (if (some #(= % command-name) (keys commands/exports))
+      (do (println "Running command:" command-name)
+          ;; Apply the function
+          ((get commands/exports command-name)))
+      (do (println command-name "is not a valid command name.")
+          (println "Choose one of:" (clojure.string/join ", " (keys commands/exports)))
+          (println "For example: lein run" (first (keys commands/exports))))))
   ;; Don't stop process
   (async/<!! (run)))

@@ -2,6 +2,8 @@
 
 Convincing my brain cells to form a quorum.
 
+None of this code is in any way intended for production use. It's completely untested and is only intended to aid learning at the first stage of using Kafka.
+
 ## Starting Kafka
 
 This is from https://kafka.apache.org/quickstart, ideally we could spin up a docker container but for some reason the networking wasn't playing ball. Will come back to that (https://github.com/wurstmeister/kafka-docker, https://github.com/wurstmeister/kafka-docker/wiki/Connectivity).
@@ -16,14 +18,18 @@ This is from https://kafka.apache.org/quickstart, ideally we could spin up a doc
 
 Run with lein:
 ```
-lein run
+lein run {command-name}
 ```
 
 Build uberjar and run it:
 ```
 lein uberjar
-java -jar target/uberjar/grokking-kafka-0.1.0-SNAPSHOT-standalone.jar
+java -jar target/uberjar/grokking-kafka-0.1.0-SNAPSHOT-standalone.jar {command-name}
 ```
+
+where command name is one of the available commands. Run with no args to get a list of available commands printed to the console.
+
+When the program starts, it will publish a stream of randomly generated events to one topic and updates to a user profile to another (full profile, not diffs). Each of the commands will then consume it in some way to demonstrate how the consumption of topics works in Kafka.
 
 ## Guides/Docs/Resources
 - https://kafka.apache.org/22/javadoc/index.html?org/apache/kafka/clients/producer/KafkaProducer.html
