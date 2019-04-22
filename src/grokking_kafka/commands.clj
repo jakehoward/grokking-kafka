@@ -52,17 +52,15 @@
       (while true
         (let [records (.poll event-consumer 10)]
           (doseq [record records]
-            (print-record record)
-            ;; Not good for throughput
-            (.commitSync event-consumer)))))
+            (print-record record))
+          (.commitSync event-consumer))))
 
     (async/thread
       (while true
         (let [records (.poll user-consumer 5)]
           (doseq [record records]
-            (print-record record)
-            ;; Not good for throughput
-            (.commitSync user-consumer)))))))
+            (print-record record))
+          (.commitSync user-consumer))))))
 
 
 ;; +++++++++++++++++++++++
@@ -100,9 +98,8 @@
       (while true
         (let [records (.poll consumer 10)]
           (doseq [record records]
-            (print-record record)
-            ;; Not good for throughput
-            (.commitSync consumer)))))))
+            (print-record record))
+          (.commitSync consumer))))))
 
 (defn basic-stream-map []
   (let [consumer-cfg {"bootstrap.servers" "localhost:9092"
@@ -139,9 +136,8 @@
       (while true
         (let [records (.poll consumer 10)]
           (doseq [record records]
-            (print-record record)
-            ;; Not good for throughput
-            (.commitSync consumer)))))))
+            (print-record record))
+          (.commitSync consumer))))))
 
 
 (defn basic-stream-count []
@@ -188,10 +184,8 @@
       (while true
         (let [records (.poll consumer 10)]
           (doseq [record records]
-            ;; (print-record record)
-            (println "Record:" record)
-            ;; Not good for throughput
-            (.commitSync consumer)))))))
+            (println "Record:" record))
+          (.commitSync consumer))))))
 
 (def exports {"basic-pub-sub" basic-pub-sub
               "basic-stream-pipe" basic-stream-pipe
