@@ -31,7 +31,10 @@
 ;; Basic Publish Subscribe
 ;; +++++++++++++++++++++++
 (defn basic-pub-sub []
-  (let [event-consumer-cfg {"bootstrap.servers" "localhost:9092"
+  ;; will find the other servers if you pass only one bootstrap server,
+  ;; but if the one you list is down then of course it won't be able
+  ;; to connect to the cluster
+  (let [event-consumer-cfg {"bootstrap.servers" "localhost:9092,localhost:9092"
                             "group.id" "basic-pub-sub-event-stream-consumer"
                             "auto.offset.reset" "earliest"
                             "enable.auto.commit" "false"
